@@ -184,6 +184,14 @@ public abstract class AbstractJerseyEurekaHttpClient implements EurekaHttpClient
         ClientResponse response = null;
         String regionsParamValue = null;
         try {
+            logger.info("AbstractJerseyEurekaHttpClient.getApplicationsInternal" +
+                            ", serviceUrl: {}" +
+                            ", urlPath: {}" +
+                            ", regions: {}",
+                    serviceUrl,
+                    urlPath,
+                    regions
+            );
             WebResource webResource = jerseyClient.resource(serviceUrl).path(urlPath);
             if (regions != null && regions.length > 0) {
                 regionsParamValue = StringUtil.join(regions);
@@ -192,15 +200,26 @@ public abstract class AbstractJerseyEurekaHttpClient implements EurekaHttpClient
             Builder requestBuilder = webResource.getRequestBuilder();
             addExtraHeaders(requestBuilder);
             response = requestBuilder.accept(MediaType.APPLICATION_JSON_TYPE).get(ClientResponse.class);
+            logger.info("AbstractJerseyEurekaHttpClient.getApplicationsInternal" +
+                    ", response: {}" +
+                    ", statusCode: {}", response, response.getStatus());
 
             Applications applications = null;
+            logger.info("AbstractJerseyEurekaHttpClient.getApplicationsInternal" +
+                    ", applications: {}", applications);
             if (response.getStatus() == Status.OK.getStatusCode() && response.hasEntity()) {
                 applications = response.getEntity(Applications.class);
             }
-            return anEurekaHttpResponse(response.getStatus(), Applications.class)
+            final EurekaHttpResponse<Applications> retval = anEurekaHttpResponse(response.getStatus(), Applications.class)
                     .headers(headersOf(response))
                     .entity(applications)
                     .build();
+            logger.info("AbstractJerseyEurekaHttpClient.getApplicationsInternal" +
+                    ", retval: {}", retval);
+            return retval;
+        } catch (Exception e) {
+            logger.info("AbstractJerseyEurekaHttpClient.getApplicationsInternal, error: {}", e);
+            throw e;
         } finally {
             if (logger.isDebugEnabled()) {
                 logger.debug("Jersey HTTP GET {}/{}?{}; statusCode={}",

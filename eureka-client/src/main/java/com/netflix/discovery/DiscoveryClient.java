@@ -405,6 +405,8 @@ public class DiscoveryClient implements EurekaClient {
             throw new RuntimeException("Failed to initialize DiscoveryClient!", e);
         }
 
+        logger.info("DiscoveryClient constructor, clientConfig.shouldFetchRegistry(): {}", clientConfig.shouldFetchRegistry());
+
         if (clientConfig.shouldFetchRegistry() && !fetchRegistry(false)) {
             fetchRegistryFromBackup();
         }
@@ -910,6 +912,15 @@ public class DiscoveryClient implements EurekaClient {
             // applications
             Applications applications = getApplications();
 
+            logger.info("forceFullRegistryFetch: {}", forceFullRegistryFetch);
+            logger.info("Disable delta property : {}", clientConfig.shouldDisableDelta());
+            logger.info("Single vip registry refresh property : {}", clientConfig.getRegistryRefreshSingleVipAddress());
+            logger.info("Force full registry fetch : {}", forceFullRegistryFetch);
+            logger.info("Application is null : {}", (applications == null));
+            logger.info("Registered Applications size is zero : {}",
+                    (applications.getRegisteredApplications().size() == 0));
+            logger.info("Application version is -1: {}", (applications.getVersion() == -1));
+
             if (clientConfig.shouldDisableDelta()
                     || (!Strings.isNullOrEmpty(clientConfig.getRegistryRefreshSingleVipAddress()))
                     || forceFullRegistryFetch
@@ -917,13 +928,6 @@ public class DiscoveryClient implements EurekaClient {
                     || (applications.getRegisteredApplications().size() == 0)
                     || (applications.getVersion() == -1)) //Client application does not have latest library supporting delta
             {
-                logger.info("Disable delta property : {}", clientConfig.shouldDisableDelta());
-                logger.info("Single vip registry refresh property : {}", clientConfig.getRegistryRefreshSingleVipAddress());
-                logger.info("Force full registry fetch : {}", forceFullRegistryFetch);
-                logger.info("Application is null : {}", (applications == null));
-                logger.info("Registered Applications size is zero : {}",
-                        (applications.getRegisteredApplications().size() == 0));
-                logger.info("Application version is -1: {}", (applications.getVersion() == -1));
                 getAndStoreFullRegistry();
             } else {
                 getAndUpdateDelta(applications);
@@ -1007,11 +1011,27 @@ public class DiscoveryClient implements EurekaClient {
         long currentUpdateGeneration = fetchRegistryGeneration.get();
 
         logger.info("Getting all instance registry info from the eureka server");
+        logger.info("DiscoveryClient.getAndStoreFullRegistry" +
+                ", getRegistryRefreshSingleVipAddress: {}" +
+                ", remoteRegionsRef: {}" +
+                ", eurekaTransport: {}" +
+                ", queryClient: {}",
+                clientConfig.getRegistryRefreshSingleVipAddress(),
+                remoteRegionsRef.get(),
+                eurekaTransport,
+                eurekaTransport.queryClient
+        );
 
         Applications apps = null;
         EurekaHttpResponse<Applications> httpResponse = clientConfig.getRegistryRefreshSingleVipAddress() == null
                 ? eurekaTransport.queryClient.getApplications(remoteRegionsRef.get())
                 : eurekaTransport.queryClient.getVip(clientConfig.getRegistryRefreshSingleVipAddress(), remoteRegionsRef.get());
+        logger.info("DiscoveryClient.getAndStoreFullRegistry" +
+                ", httpResponse: {}" +
+                ", getStatusCode: {}",
+                httpResponse,
+                httpResponse.getStatusCode()
+        );
         if (httpResponse.getStatusCode() == Status.OK.getStatusCode()) {
             apps = httpResponse.getEntity();
         }
@@ -1427,8 +1447,14 @@ public class DiscoveryClient implements EurekaClient {
             boolean remoteRegionsModified = false;
             // This makes sure that a dynamic change to remote regions to fetch is honored.
             String latestRemoteRegions = clientConfig.fetchRegistryForRemoteRegions();
+            logger.info("DiscoveryClient.refreshRegistry" +
+                    ", isFetchingRemoteRegionRegistries: {}" +
+                    ", latestRemoteRegions: {}", isFetchingRemoteRegionRegistries, latestRemoteRegions);
             if (null != latestRemoteRegions) {
                 String currentRemoteRegions = remoteRegionsToFetch.get();
+                logger.info("DiscoveryClient.refreshRegistry" +
+                        ", currentRemoteRegions: {}" +
+                        ", equals: {}", currentRemoteRegions, latestRemoteRegions.equals(currentRemoteRegions));
                 if (!latestRemoteRegions.equals(currentRemoteRegions)) {
                     // Both remoteRegionsToFetch and AzToRegionMapper.regionsToFetch need to be in sync
                     synchronized (instanceRegionChecker.getAzToRegionMapper()) {
@@ -1449,6 +1475,9 @@ public class DiscoveryClient implements EurekaClient {
             }
 
             boolean success = fetchRegistry(remoteRegionsModified);
+            logger.info("DiscoveryClient.refreshRegistry" +
+                    ", success: {}" +
+                    ", isDebugEnabled: {}", success, logger.isDebugEnabled());
             if (success) {
                 registrySize = localRegionApps.get().size();
                 lastSuccessfulRegistryFetchTimestamp = System.currentTimeMillis();
@@ -1485,17 +1514,22 @@ public class DiscoveryClient implements EurekaClient {
             if (null == backupRegistryInstance) { // backward compatibility with the old protected method, in case it is being used.
                 backupRegistryInstance = backupRegistryProvider.get();
             }
+            logger.info("DiscoveryClient.fetchRegistryFromBackup" +
+                    ", backupRegistryInstance: {}" +
+                    ", isFetchingRemoteRegionRegistries: {}", backupRegistryInstance, isFetchingRemoteRegionRegistries());
 
             if (null != backupRegistryInstance) {
                 Applications apps = null;
                 if (isFetchingRemoteRegionRegistries()) {
                     String remoteRegionsStr = remoteRegionsToFetch.get();
+                    logger.info("DiscoveryClient.fetchRegistryFromBackup, remoteRegionsStr: {}", remoteRegionsStr);
                     if (null != remoteRegionsStr) {
                         apps = backupRegistryInstance.fetchRegistry(remoteRegionsStr.split(","));
                     }
                 } else {
                     apps = backupRegistryInstance.fetchRegistry();
                 }
+                logger.info("DiscoveryClient.fetchRegistryFromBackup, apps: {}", apps);
                 if (apps != null) {
                     final Applications applications = this.filterAndShuffle(apps);
                     applications.setAppsHashCode(applications.getReconcileHashCode());
@@ -1503,6 +1537,7 @@ public class DiscoveryClient implements EurekaClient {
                     logTotalInstances();
                     logger.info("Fetched registry successfully from the backup");
                 }
+                logger.info("DiscoveryClient.fetchRegistryFromBackup, localRegionApps: {}", localRegionApps);
             } else {
                 logger.warn("No backup registry instance defined & unable to find any discovery servers.");
             }
