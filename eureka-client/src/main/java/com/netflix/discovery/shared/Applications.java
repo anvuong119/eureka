@@ -122,6 +122,9 @@ public class Applications {
      *            the <em>application</em> to be added.
      */
     public void addApplication(Application app) {
+        System.out.println("Applications.addApplications"
+                + ", app: " + app
+                + ", upperCasedAppName: " + app.getName().toUpperCase(Locale.ROOT));
         appNameApplicationMap.put(app.getName().toUpperCase(Locale.ROOT), app);
         addInstancesToVIPMaps(app, this.virtualHostNameAppMap, this.secureVirtualHostNameAppMap);
         applications.add(app);
@@ -147,6 +150,10 @@ public class Applications {
      *         name.
      */
     public Application getRegisteredApplications(String appName) {
+        System.out.println("Applications.getRegisteredApplications"
+                + ", appNameApplicationMap: " + appNameApplicationMap
+                + ", appName: " + appName
+                + ", upperCasedAppName: " + appName.toUpperCase(Locale.ROOT));
         return appNameApplicationMap.get(appName.toUpperCase(Locale.ROOT));
     }
 
